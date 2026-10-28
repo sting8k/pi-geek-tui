@@ -2,7 +2,7 @@
 
 Forked from pi-droid-styling 2.18.0; earlier history: https://github.com/sting8k/pi-droid-styling/blob/main/CHANGELOG.md
 
-## Unreleased
+## 0.2.1 - 2026-10-28
 
 ### Fixed
 - Extension dialogs in the input area (pi-askuserquestion's ask_user_question, an extension's text input with a long prompt) no longer lose their last rows. The panel cut them to 8 rows and could not scroll to the rest, so the last option or the input field was hidden. Dialogs whose cursor marker the panel does not recognize now get as many rows as the screen holds.
