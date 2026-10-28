@@ -181,8 +181,8 @@ function shrinkPiList(child: object, overflow: number): boolean {
 	return true;
 }
 
-/** Panel rows for a foreign slot child: exactly `width` cells each, at most `maxRows` tall (excluding the head row). */
-function frameSlotChild(child: { render(width: number): string[] }, width: number, terminalRows = 40, crumbs: Crumbs = { trail: [] }): string[] {
+/** Panel rows for a foreign slot child: exactly `width` cells each; with `chromeRows` of our own under it, never taller than the terminal. */
+function frameSlotChild(child: { render(width: number): string[] }, width: number, terminalRows = 40, crumbs: Crumbs = { trail: [] }, chromeRows = 0): string[] {
 	const total = Math.max(0, Math.floor(width));
 	if (total <= GEEK_PREFIX_WIDTH) return child.render(total).map((row) => truncateToWidth(row, total, "", true));
 	const bodyWidth = total - GEEK_PREFIX_WIDTH;
@@ -200,7 +200,10 @@ function frameSlotChild(child: { render(width: number): string[] }, width: numbe
 	const budget = Math.max(MIN_BODY_ROWS, Math.min(MAX_BODY_ROWS, Math.floor(terminalRows * 0.4) - rows.length - 2));
 	// Fit Pi's own window first; our window below is then only the fallback for lists with a fixed window.
 	if (model.body.length > budget && shrinkPiList(child, model.body.length - budget)) model = classify(child.render(innerWidth));
-	const windowed = windowRows(model.body, model.selected, budget);
+	// No selection marker we know (an extension's own dialog, e.g. pi-askuserquestion's `>`): a window could not follow
+	// the cursor and would hide the last rows for good, so show the whole body as far as the screen holds it.
+	const fit = model.selected >= 0 ? budget : Math.max(budget, terminalRows - chromeRows - rows.length - (model.detail ? 1 : 0) - 1);
+	const windowed = windowRows(model.body, model.selected, fit);
 	windowed.rows.forEach((row, i) => rows.push(panelRow(row, bodyWidth, windowed.start + i === model.selected ? "panelSel" : "panel")));
 	if (model.detail) rows.push(panelRow(`  ${geekFg("faint", model.detail)}`, bodyWidth));
 	rows.push(panelRow(geekFg("faint", model.hint ?? DEFAULT_HINT), bodyWidth));
@@ -221,10 +224,10 @@ function patchContainer(container: RenderableContainer | undefined, mode: any): 
 			return baseRender(width);
 		}
 		const rows = Number(mode?.ui?.terminal?.rows) || 40;
-		const lines = children.flatMap((child) => (child?.[OWN_EDITOR_ROWS] ? child.render(width) : frameSlotChild(child, width, rows, crumbs)));
 		// Keep our head row (path, branch, diff, live state) and the footer under the panel: the zone reads the same
 		// as depth 1 and the footer, which lives inside the editor, stays on screen.
 		const chrome = mode?.editor?.[OWN_EDITOR_ROWS] && typeof mode.editor.renderChrome === "function" ? mode.editor.renderChrome(width) : [];
+		const lines = children.flatMap((child) => (child?.[OWN_EDITOR_ROWS] ? child.render(width) : frameSlotChild(child, width, rows, crumbs, chrome.length)));
 		return [...lines, ...chrome];
 	};
 }

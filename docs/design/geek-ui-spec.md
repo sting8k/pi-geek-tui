@@ -127,7 +127,9 @@ stock border strokes replaced by blank panel rows, `→` selection marker shown 
 Header = breadcrumb from the component's own title (` settings › Theme`, a submenu pushes a level, long trails
 left-truncate with `…`) + faint `i/N`; Pi's hint row is kept, else a default one. While a selector is open the
 input row hides; the head row and footer stay under the panel. The panel body is windowed to ~40% of the terminal
-height (3..8 body rows) so the footer always stays on screen.
+height (3..8 body rows) so the footer always stays on screen. A body without a known selection marker (an extension's own
+dialog, e.g. ask_user_question's `>` cursor) cannot be windowed around the cursor, so it is not cut to that cap: it
+grows to whatever the terminal holds above the head row and footer.
 
 ### 9. Footer (rule + one statusline row, directly under the input — no blank row between)
 ```

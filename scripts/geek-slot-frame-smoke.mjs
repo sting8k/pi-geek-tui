@@ -62,7 +62,12 @@ for (const width of [112, 62, 30]) {
 		expect(`${name}@${width}: first and last panel cell of every row is a bg-only space`, rows.every((row) => row.slice(P).startsWith("\x1b[48;2;") && strip(row)[P] === " " && strip(row).at(-1) === " "), JSON.stringify(rows.map((row) => [strip(row)[P], strip(row).at(-1)])));
 		expect(`${name}@${width}: no stock border strokes`, !rows.some((row) => /─{3,}/.test(strip(row))));
 		expect(`${name}@${width}: head + footer stay under the panel`, strip(all[all.length - 3]).startsWith("      • bean@proj") && strip(all[all.length - 1]).includes("statusline"), JSON.stringify(all.slice(-3).map(strip)));
-		expect(`${name}@${width}: panel within the cap (24 rows → ≤ 40%)`, rows.length <= 1 + 8 + 1 + 1 + 1, String(rows.length));
+		if (name === "extInput") {
+			// No list marker: the wrapped prompt is never cut down to the cap, so the input field under it stays visible.
+			expect(`${name}@${width}: input field shown, everything fits the terminal`, rows.some((row) => strip(row).slice(P).trim() === ">") && all.length <= 24, JSON.stringify(all.map(strip)));
+		} else {
+			expect(`${name}@${width}: panel within the cap (24 rows → ≤ 40%)`, rows.length <= 1 + 8 + 1 + 1 + 1, String(rows.length));
+		}
 	}
 }
 
@@ -140,6 +145,26 @@ expect("long crumbs truncate from the LEFT with an ellipsis", narrow.includes("�
 state.title = undefined;
 expect("counter `1/2` goes to the right of the header", /1\/2 *$/.test(headerOf()), headerOf());
 expect("search input row kept, detail/blank rows dropped", render(80).map(strip).some((row) => row.slice(P).trim().startsWith(">")));
+
+// --- an extension's own dialog (rows as pi-askuserquestion draws them: `>` cursor, descriptions, a last free-text option):
+// no Pi list to shrink and no marker we know, so nothing may be cut while it fits on screen, and it never pushes the footer off.
+class FakeDialog extends Container {}
+const dialog = new FakeDialog();
+dialog.render = (width) => [
+	"─".repeat(width),
+	" Which approach should we take for the cache layer?",
+	"",
+	...["Redis", "In-memory LRU", "SQLite", "No cache"].flatMap((label, i) => [`${i === 0 ? ">" : " "}   ${i + 1}. ${label}`, `     description of ${label}`]),
+	"    5. Type your own answer...",
+	"",
+	" ↑↓ navigate · Enter select · Esc cancel",
+	"─".repeat(width),
+];
+swapIn(dialog);
+const dialogRows = render(100, 45).map(strip);
+expect("extension dialog: last option shown", dialogRows.some((row) => row.includes("5. Type your own answer...")), JSON.stringify(dialogRows));
+expect("extension dialog: every option shown", ["Redis", "In-memory LRU", "SQLite", "No cache"].every((label) => dialogRows.some((row) => row.includes(`. ${label}`))), JSON.stringify(dialogRows));
+for (const height of [45, 14, 10]) expect(`extension dialog @${height} rows: panel + chrome fit the terminal`, render(100, height).length <= height, String(render(100, height).length));
 
 // --- Esc path: back to our editor, rows unframed again
 swapIn(new OwnEditor());
