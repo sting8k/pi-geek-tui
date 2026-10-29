@@ -1,6 +1,6 @@
 {
   "name": "@sting8k/pi-geek-tui",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Geek terminal UI for Pi: continuous rail, one-row tool calls in collapsible groups, box-less input zone, one-row statusline.",
   "type": "module",
   "main": "index.ts",
