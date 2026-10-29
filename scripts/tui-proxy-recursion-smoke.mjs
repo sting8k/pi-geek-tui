@@ -136,9 +136,8 @@ function ok(label) {
 
 compileSources();
 
-const [physicalSync, throttle, autowrap, widthGuard, frameBackground, frameDebug, padding] = await Promise.all([
+const [physicalSync, autowrap, widthGuard, frameBackground, frameDebug, padding] = await Promise.all([
 	importBuilt("performance/render-physical-sync.js"),
-	importBuilt("performance/render-throttle.js"),
 	importBuilt("performance/render-autowrap-guard.js"),
 	importBuilt("performance/render-width-guard.js"),
 	importBuilt("performance/render-frame-background.js"),
@@ -147,7 +146,6 @@ const [physicalSync, throttle, autowrap, widthGuard, frameBackground, frameDebug
 ]);
 
 const { installRenderPhysicalSync } = physicalSync;
-const { installRenderThrottle } = throttle;
 const { installRenderAutowrapGuard } = autowrap;
 const { installRenderWidthGuard } = widthGuard;
 const { installRenderFrameBackground } = frameBackground;
@@ -163,7 +161,6 @@ process.env.PI_GEEK_RENDER_SHAPE_REPAINT = "1";
 process.env.PI_GEEK_RENDER_DEBUG_DIR = join(buildDir, "debug");
 
 function installAllWrappers(tui) {
-	installRenderThrottle(tui, 29);
 	installTuiPadding(tui);
 	installRenderAutowrapGuard(tui);
 	installRenderWidthGuard(tui);
@@ -186,7 +183,6 @@ console.log("Proxy path:");
 	// The proxy `set` wrote wrappers onto the real renderer.
 	assert(typeof renderer.doRender === "function" && renderer.doRender.name !== "doRender", "doRender was wrapped through the proxy");
 	assert(typeof renderer.render === "function" && renderer.render.name !== "render", "render was wrapped through the proxy");
-	assert(typeof renderer.requestRender === "function" && renderer.requestRender.name !== "requestRender", "requestRender was wrapped through the proxy");
 	assert(typeof renderer.applyLineResets === "function" && renderer.applyLineResets.name !== "applyLineResets", "applyLineResets was wrapped through the proxy");
 
 	// Drive the REAL renderer methods (as Pi does) and assert no recursion.
@@ -196,16 +192,12 @@ console.log("Proxy path:");
 	ok("renderer.render() no recursion");
 	assertNoRecursion(() => renderer.applyLineResets(["x", "y"]), "renderer.applyLineResets()");
 	ok("renderer.applyLineResets() no recursion");
-	assertNoRecursion(() => renderer.requestRender(true), "renderer.requestRender()");
-	ok("renderer.requestRender() no recursion");
 
 	// Also drive through the proxy (as Pi calls this.ui.*).
 	assertNoRecursion(() => tui.doRender(), "proxy tui.doRender()");
 	ok("proxy tui.doRender() no recursion");
 	assertNoRecursion(() => tui.render(100), "proxy tui.render()");
 	ok("proxy tui.render() no recursion");
-	assertNoRecursion(() => tui.requestRender(true), "proxy tui.requestRender()");
-	ok("proxy tui.requestRender() no recursion");
 	assertNoRecursion(() => tui.applyLineResets(["p", "q"]), "proxy tui.applyLineResets()");
 	ok("proxy tui.applyLineResets() no recursion");
 
@@ -217,7 +209,6 @@ console.log("Proxy path:");
 	assertNoRecursion(() => renderer2.doRender(), "renderer2.doRender() after switch");
 	assertNoRecursion(() => renderer2.render(80), "renderer2.render() after switch");
 	assertNoRecursion(() => renderer2.applyLineResets(["a"]), "renderer2.applyLineResets() after switch");
-	assertNoRecursion(() => renderer2.requestRender(true), "renderer2.requestRender() after switch");
 	ok("renderer switch + reinstall no recursion");
 }
 
@@ -231,7 +222,6 @@ console.log("Real renderer path:");
 	assertNoRecursion(() => renderer.doRender(), "real renderer.doRender()");
 	assertNoRecursion(() => renderer.render(100), "real renderer.render()");
 	assertNoRecursion(() => renderer.applyLineResets(["a"]), "real renderer.applyLineResets()");
-	assertNoRecursion(() => renderer.requestRender(true), "real renderer.requestRender()");
 	ok("real renderer methods no recursion");
 }
 

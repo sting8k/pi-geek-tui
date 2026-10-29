@@ -100,7 +100,7 @@ Synthetic self-check:
 npm run profile:render
 ```
 
-The synthetic bench exercises footer/editor rendering, render throttle, assistant/tool debounce, and git status refresh. Runtime terminal paint/GPU cost still needs a real Pi TUI capture.
+The synthetic bench exercises footer/editor rendering, assistant/tool debounce, and git status refresh. Runtime terminal paint/GPU cost still needs a real Pi TUI capture.
 
 ## Notes
 

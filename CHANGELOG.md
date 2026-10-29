@@ -2,6 +2,11 @@
 
 Forked from pi-droid-styling 2.18.0; earlier history: https://github.com/sting8k/pi-droid-styling/blob/main/CHANGELOG.md
 
+## Unreleased
+
+### Changed
+- Removed pi-geek-tui's own render throttle (one frame per 29 ms, about 35 per second). Pi 1.x already limits rendering to one frame per 16 ms, so the extra layer only lowered the frame rate and spaced frames unevenly while scrolling. Measured on Pi 1.4 fullscreen: p95 gap between frames 61 ms → 45 ms (stock Pi: 39 ms).
+
 ## 0.2.1 - 2026-10-28
 
 ### Fixed

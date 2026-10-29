@@ -16,7 +16,6 @@ export { installFinishedRenderCache } from "./performance/finished-render-cache.
 export { installRenderAutowrapGuard } from "./performance/render-autowrap-guard.js";
 export { installRenderFrameBackground } from "./performance/render-frame-background.js";
 export { installRenderPhysicalSync } from "./performance/render-physical-sync.js";
-export { installRenderThrottle } from "./performance/render-throttle.js";
 export { installRenderWidthGuard } from "./performance/render-width-guard.js";
 export { installInteractiveChatVirtualization, virtualizeChatContainer } from "./performance/virtualize-chat.js";
 export { applyTerminalPageBackgroundOsc11, clearTerminalPageBackgroundOsc111 } from "./theme/terminal-background.js";

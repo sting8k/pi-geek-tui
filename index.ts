@@ -307,7 +307,6 @@ export default function (pi: ExtensionAPI) {
 			} else {
 				restoreTerminalBackgroundForCurrentSession = modules.applyTerminalPageBackgroundOsc11(uiTheme, (tui as any).terminal as any, { force: config.forceOSC11 });
 			}
-			modules.installRenderThrottle(tui as any);
 			modules.setAssistantUpdateRenderRequester(() => tui.requestRender());
 			requestRenderForDiffStat = () => tui.requestRender();
 			modules.virtualizeChatContainer(tui as any, config.visibleChatTail);

@@ -74,7 +74,7 @@ theme/
   Fixed palette (geek-palette.ts) and the host Theme built from it (geek-theme.ts), ANSI helpers, shared frame background row painting, and platform-gated OSC 11 terminal background sync
 
 performance/
-  Debounce, throttle, virtualization, root frame background, and physical-sync patches for render hot paths
+  Debounce, virtualization, root frame background, and physical-sync patches for render hot paths
   - debounce-update.ts (the assistant presentation buffer) and finished-render-cache.ts both read the
     assistant stream state from messages/assistant-streaming-state.ts: only the component attached to
     the live stream is buffered, and its render bypasses the finished cache

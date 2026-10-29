@@ -63,9 +63,8 @@ async function importBuilt(relativePath) {
 
 compileSources();
 
-const [profiler, renderThrottle, assistantDebounce, toolDebounce, streamingMarkdownCache, finishedRenderCache] = await Promise.all([
+const [profiler, assistantDebounce, toolDebounce, streamingMarkdownCache, finishedRenderCache] = await Promise.all([
 	importBuilt("performance/profiler.js"),
-	importBuilt("performance/render-throttle.js"),
 	importBuilt("performance/debounce-update.js"),
 	importBuilt("performance/debounce-tool-updates.js"),
 	importBuilt("messages/streaming-markdown-cache.js"),
@@ -73,19 +72,11 @@ const [profiler, renderThrottle, assistantDebounce, toolDebounce, streamingMarkd
 ]);
 
 const { flushProfile, profileCount, profileSample } = profiler;
-const { installRenderThrottle } = renderThrottle;
 const { installAssistantUpdateDebounce, setAssistantUpdateRenderRequester } = assistantDebounce;
 const { installToolExecutionUpdateDebounce } = toolDebounce;
 const { installAssistantStreamingMarkdownCache } = streamingMarkdownCache;
 const { installFinishedRenderCache } = finishedRenderCache;
 const { AssistantMessageComponent, ToolExecutionComponent } = await import("@earendil-works/pi-coding-agent");
-
-let throttledDispatches = 0;
-const throttledTui = { requestRender: () => { throttledDispatches++; } };
-installRenderThrottle(throttledTui, 10);
-for (let i = 0; i < 50; i++) throttledTui.requestRender(i % 17 === 0);
-await sleep(30);
-profileSample("bench.throttledDispatches", throttledDispatches);
 
 class FakeAssistantMessage {
 	updates = 0;
@@ -199,5 +190,4 @@ rmSync(buildDir, { recursive: true, force: true });
 console.log(JSON.stringify({
 	profileOut: process.env.PI_GEEK_PROFILE_OUT,
 	iterations,
-	throttledDispatches,
 }, null, 2));
