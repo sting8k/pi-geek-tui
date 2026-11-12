@@ -24,7 +24,8 @@ const expect = (name, condition, detail = "") => { if (!condition) failures.push
 
 const HEAD = (width) => "      • bean@proj".padEnd(width);
 const FOOT = (width) => ["─".repeat(width), "  statusline".padEnd(width)];
-class OwnEditor { render(width) { return [HEAD(width), "        › input".padEnd(width), ...FOOT(width)]; } renderChrome(width) { return [HEAD(width), ...FOOT(width)]; } setText() {} getText() { return ""; } }
+let editorClicks = 0;
+class OwnEditor { handleMouse() { editorClicks++; return { handled: true, focus: true }; } render(width) { return [HEAD(width), "        › input".padEnd(width), ...FOOT(width)]; } renderChrome(width) { return [HEAD(width), ...FOOT(width)]; } setText() {} getText() { return ""; } }
 OwnEditor.prototype[OWN_EDITOR_ROWS] = true;
 installEditorSlotFrame(core.InteractiveMode);
 const mode = {
@@ -171,6 +172,17 @@ for (const height of [45, 14, 10]) expect(`extension dialog @${height} rows: pan
 // --- Esc path: back to our editor, rows unframed again
 swapIn(new OwnEditor());
 expect("Esc path: back to the editor", render(80).length === 4 && render(80)[1].includes("› input"));
+
+// --- mouse: a click on a panel must not reach the editor the panel replaced (it would take focus from the dialog)
+const click = (y, height) => container.handleMouse({ type: "click", button: "left", x: 10, y, width: 80, height, screenX: 10, screenY: y });
+editorClicks = 0;
+expect("mouse: a click on our editor reaches it", click(1, 4)?.focus === true && editorClicks === 1, `${editorClicks} clicks`);
+swapIn(dialog);
+const panelHeight = render(80).length;
+for (let y = 0; y < panelHeight; y++) click(y, panelHeight);
+expect("mouse: a click on a dialog panel never reaches the hidden editor", editorClicks === 1, `${editorClicks - 1} clicks leaked`);
+swapIn(new OwnEditor());
+render(80);
 
 swapIn(selectors.theme());
 console.log(render(70).map(strip).join("\n"));

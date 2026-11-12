@@ -8,6 +8,9 @@ Forked from pi-droid-styling 2.18.0; earlier history: https://github.com/sting8k
 - Streamed answers keep a steady pace when the server sends text in large bursts. The reveal used to rush through each burst within 0.35 s and then stop until the next one; it now spreads each burst over the measured wait for the next one (0.25–0.5 s), and the fade widens with the speed (6–40 characters) so fast text fades in instead of popping in.
 - Thinking that ends in a tool call stays visible. It was folded into the tool group and only shown with `Ctrl+O` (not at all for a lone call); the `thinking · …` row now stays above the calls, as it does before an answer. Group heads no longer count thoughts, and the `T` thought badge is gone.
 
+### Fixed
+- A mouse click on the top rows of a dialog or selector in the input area (pi-askuserquestion's question box, `/model`, `/settings`…) no longer freezes it. The click reached the editor hidden under the panel and moved keyboard focus there: the dialog stayed on screen but ignored every key, and only quitting Pi got out. It happened most when clicking the terminal to come back to Pi. Panels now take no mouse input.
+
 ### Compatibility
 - Checked against Pi 1.5.0: no runtime change needed (only two test stubs were updated).
 

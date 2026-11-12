@@ -210,16 +210,22 @@ function frameSlotChild(child: { render(width: number): string[] }, width: numbe
 	return rows.map((row) => prefix + row);
 }
 
-type RenderableContainer = { children: any[]; render(width: number): string[] };
+type RenderableContainer = { children: any[]; render(width: number): string[]; handleMouse?(event: any): unknown };
 
 function patchContainer(container: RenderableContainer | undefined, mode: any): void {
 	if (!container || (container as any)[PATCHED]) return;
 	(container as any)[PATCHED] = true;
 	const baseRender = container.render.bind(container);
 	const crumbs: Crumbs = { trail: [] };
+	const ownsEveryRow = (): boolean => container.children.every((child) => child?.[OWN_EDITOR_ROWS]);
+	// Pi's Container routes a click by the child heights of its own last render. A panel is drawn here, not by that
+	// render, so those heights still describe the editor the panel replaced: a click on the panel's first rows reached
+	// that hidden editor and gave it keyboard focus, leaving the dialog on screen but deaf. A panel takes no mouse input.
+	const baseHandleMouse = container.handleMouse?.bind(container);
+	if (baseHandleMouse) container.handleMouse = (event: any): unknown => (ownsEveryRow() ? baseHandleMouse(event) : undefined);
 	container.render = (width: number): string[] => {
 		const children = container.children;
-		if (children.every((child) => child?.[OWN_EDITOR_ROWS])) {
+		if (ownsEveryRow()) {
 			crumbs.child = undefined;
 			return baseRender(width);
 		}
