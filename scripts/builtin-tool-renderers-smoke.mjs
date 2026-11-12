@@ -248,7 +248,7 @@ async function runBuiltinToolRenderersSmoke() {
 		render: (w) => [`ASSISTANT`.padEnd(w)],
 	});
 	const finished = [
-		assistant("check ttl"),
+		assistant(),
 		tool("read", { path: "src/auth/session.ts" }),
 		tool("read", { path: "src/auth/token.ts" }),
 		tool("grep", { pattern: "REFRESH_TTL", path: "src" }),
@@ -257,7 +257,7 @@ async function runBuiltinToolRenderersSmoke() {
 	for (const width of [120, 80, 50]) {
 		const rows = groups.renderChatChildren(finished, width).map(strip);
 		assert(rows.length === 6 && rows.every((row) => visibleWidth(row) === width), `@${width}: head + 4 call rows + blank, each exactly the chat width, never wrapped: ${JSON.stringify(rows)}`);
-		assert(rows[0].startsWith(" ┃ Done(4 tool calls · 1 thought)"), `@${width}: head: ${rows[0]}`);
+		assert(rows[0].startsWith(" ┃ Done(4 tool calls)"), `@${width}: head: ${rows[0]}`);
 		assert(rows[1].includes("├─ R src/auth/session.ts") || width < 80, `@${width}: ${rows[1]}`);
 		if (width === 120) {
 			assert(rows[0].includes("^o  // 2.0s"), `head meta: ${rows[0]}`);
@@ -320,12 +320,19 @@ async function runBuiltinToolRenderersSmoke() {
 
 	// A tool-only first assistant message is folded into the group; its turn head row must survive above it.
 	const meta = await import(pathToFileURL(join(buildDir, "messages", "message-meta.js")).href);
-	const opener = assistant("plan");
+	const opener = assistant();
 	opener.lastMessage.timestamp = Date.UTC(2026, 0, 1, 14, 52);
 	meta.claimTurnHead(opener);
 	const headed = groups.renderChatChildren([opener, tool("read", { path: "a.ts" })], 100).map(strip);
 	assert(headed.length === 3 && headed[0].includes("•") && headed[0].includes("@") && headed[1].includes("R a.ts"), `turn head row must sit above the folded group: ${JSON.stringify(headed)}`);
 	assert(groups.renderChatChildren([assistant(), tool("read", { path: "a.ts" })], 100).length === 2, "an assistant member that did not open the turn adds no head row");
+
+	// A turn whose thinking shows stays a row of its own above the calls it issued; hidden behind an empty label it folds.
+	const thoughtful = groups.renderChatChildren([assistant("check ttl"), tool("read", { path: "a.ts" }), assistant("then grep"), tool("grep", { pattern: "TTL", path: "src" })], 100).map(strip);
+	const order = thoughtful.map((row) => (row.includes("ASSISTANT") ? "A" : /┃ R a\.ts/.test(row) ? "R" : /┃ G "TTL"/.test(row) ? "G" : "")).join("");
+	assert(order === "ARAG", `thinking turns render in order above their calls: ${order} ${JSON.stringify(thoughtful)}`);
+	const silent = { ...assistant("hidden"), hideThinkingBlock: true, hiddenThinkingLabel: "" };
+	assert(!groups.renderChatChildren([silent, tool("read", { path: "a.ts" })], 100).map(strip).some((row) => row.includes("ASSISTANT")), "thinking hidden behind an empty label folds into the group");
 
 	// Running → finished: every call stays visible at every stage (the user's "swallowed after finish" report).
 	const callRows = (children) => groups.renderChatChildren(children, 100).map(strip).filter((row) => /┃ (?:[├└]─ )?[R$GFLWE·] /.test(row)).length;

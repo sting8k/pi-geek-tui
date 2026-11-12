@@ -17,7 +17,7 @@ import { renderOutputBody } from "./tool-row.js";
  * Ctrl+O adds each call's output (capped by maxExpandedLines) under its guide.
  */
 
-export type TreeEntry = { kind: "tool"; tool: any } | { kind: "thought"; text: string };
+export type TreeEntry = { kind: "tool"; tool: any };
 
 const GUIDE_WIDTH = 3;
 const GUIDE_BRANCH = "├─ ";
@@ -36,7 +36,6 @@ const bodyCache = new WeakMap<object, { result: unknown; body: { render(width: n
 
 /** Expanded output of one call, built once per result object (partial updates replace it). */
 function expandedBody(entry: TreeEntry): { render(width: number): string[] } | undefined {
-	if (entry.kind === "thought") return renderOutputBody({ content: [{ type: "text", text: entry.text }] }, { expanded: true });
 	const { tool } = entry;
 	if (!tool.result) return undefined;
 	const cached = bodyCache.get(tool);
@@ -47,12 +46,8 @@ function expandedBody(entry: TreeEntry): { render(width: number): string[] } | u
 	return body;
 }
 
-/** The call line for a tool or thought entry (unclipped, styled). */
+/** The call line for a tool entry (unclipped, styled). */
 export function entryLine(entry: TreeEntry, column: number): string {
-	if (entry.kind === "thought") {
-		const flat = entry.text.replace(/\s+/g, " ").trim();
-		return callLine("thinking", geekFg("dim", `"${flat}"`), column);
-	}
 	const { tool } = entry;
 	return callLine(tool.toolName, callParams(tool.toolName, tool.args), column, Boolean(tool.result?.isError));
 }

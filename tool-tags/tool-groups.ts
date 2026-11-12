@@ -14,24 +14,34 @@ import {
 } from "./tool-summary.js";
 
 /**
- * Folds a run of consecutive tool calls (and the text-less assistant turns that issued them)
- * into one summary row (docs/design/geek-ui-spec.md §4/§7). Grouping is a pure projection of
+ * Folds a run of consecutive tool calls (and the assistant turns that issued them with nothing
+ * to show: no answer text, no visible thinking) into one summary row (docs/design/geek-ui-spec.md §4/§7). Grouping is a pure projection of
  * the chat children at render time: nothing is persisted. edit/write-class calls break a run
  * because they show their own diff rows; a run without any groupable call renders as before.
  */
 
-/** Assistant turns with no visible answer text that issued tool calls belong to the tool run. */
-function toolOnlyAssistantContent(component: any): any[] | null {
+/** Thinking renders a row unless it is hidden behind an empty label (Pi draws nothing then). */
+function showsThinking(component: any, content: any[]): boolean {
+	if (component?.hideThinkingBlock && typeof component.hiddenThinkingLabel === "string" && !component.hiddenThinkingLabel.trim()) return false;
+	return content.some((block) => block?.type === "thinking" && typeof block.thinking === "string" && block.thinking.trim());
+}
+
+/**
+ * Assistant turns that issued tool calls and show nothing themselves belong to the tool run. A turn with
+ * answer text or a visible thinking row renders as itself above the calls that follow it.
+ */
+function isToolOnlyAssistant(component: any): boolean {
 	const message = component?.lastMessage;
-	if (message?.role !== "assistant" || !Array.isArray(message.content)) return null;
-	if (message.stopReason === "error" || message.stopReason === "aborted") return null;
+	if (message?.role !== "assistant" || !Array.isArray(message.content)) return false;
+	if (message.stopReason === "error" || message.stopReason === "aborted") return false;
 	const content = message.content as any[];
-	if (content.some((block) => block?.type === "text" && typeof block.text === "string" && block.text.trim())) return null;
-	return content.some((block) => block?.type === "toolCall") ? content : null;
+	if (content.some((block) => block?.type === "text" && typeof block.text === "string" && block.text.trim())) return false;
+	if (showsThinking(component, content)) return false;
+	return content.some((block) => block?.type === "toolCall");
 }
 
 function isGroupMember(component: any): boolean {
-	return isToolComponent(component) ? !isEditClassTool(component.toolName) : toolOnlyAssistantContent(component) !== null;
+	return isToolComponent(component) ? !isEditClassTool(component.toolName) : isToolOnlyAssistant(component);
 }
 
 const bold = (text: string) => `\x1b[1m${text}\x1b[22m`;
@@ -44,29 +54,18 @@ function elapsedMeta(elapsedMs: number | undefined, running: boolean): string {
 	return parts.length > 0 ? `${dim("// ")}${parts.join(dim(" · "))}` : "";
 }
 
-/** `Done(3 tool calls · 1 thought · 1 failed)`; while running, `Running(… · <last running tool>)`. */
-function headLeft(tools: any[], thoughts: number, failed: number, running: boolean): string {
+/** `Done(3 tool calls · 1 failed)`; while running, `Running(… · <last running tool>)`. */
+function headLeft(tools: any[], failed: number, running: boolean): string {
 	const parts = [dim(plural(tools.length, "tool call"))];
-	if (thoughts > 0) parts.push(dim(plural(thoughts, "thought")));
 	if (failed > 0) parts.push(geekFg("delMark", `${failed} failed`));
 	const live = running ? tools.filter(isToolRunning).pop() : undefined;
 	if (live) parts.push(geekFg("ink", live.toolName));
 	return `${geekFg(running ? "accent" : "ink", bold(running ? "Running" : "Done"))}${dim("(")}${parts.join(dim(" · "))}${dim(")")}`;
 }
 
-function thoughtText(component: any): string {
-	const content = toolOnlyAssistantContent(component) ?? [];
-	return content
-		.filter((block) => block?.type === "thinking" && typeof block.thinking === "string")
-		.map((block) => block.thinking.trim())
-		.filter(Boolean)
-		.join(" ");
-}
-
 /**
  * One block for a run of tool calls (spec §4): a `Done(…)` / `Running(…)` head and one row per call
- * under `├─`/`└─` guides; a lone call is just its row (thoughts only show once expanded). Ctrl+O adds each call's output (and the
- * thoughts) under its guide. Folded assistant members are never rendered, so a turn-opening one hands
+ * under `├─`/`└─` guides; a lone call is just its row. Ctrl+O adds each call's output under its guide. Folded assistant members are never rendered, so a turn-opening one hands
  * over its `pi@agent` head row, printed above the block.
  */
 function renderToolGroup(members: any[], width: number): string[] {
@@ -74,7 +73,6 @@ function renderToolGroup(members: any[], width: number): string[] {
 	const running = tools.some(isToolRunning);
 	const expanded = tools.some((tool) => tool.expanded);
 	const failed = tools.filter((tool) => Boolean(tool.result?.isError)).length;
-	const thoughts = members.filter((member) => thoughtText(member)).length;
 	let elapsedMs: number | undefined;
 	for (const tool of tools) {
 		const ms = toolElapsedMs(tool);
@@ -86,19 +84,15 @@ function renderToolGroup(members: any[], width: number): string[] {
 	const hint = expanded ? "" : geekFg("faint", "^o  ");
 	const rows = members.filter((member) => !isToolComponent(member)).flatMap((member) => turnHeadRows(member, width));
 
-	if (tools.length === 1 && !(expanded && thoughts > 0)) {
+	if (tools.length === 1) {
 		const entry: TreeEntry = { kind: "tool", tool: tools[0] };
 		const line = entryLine(entry, nameColumn([tools[0].toolName]));
 		rows.push(geekRow(rail, geekSplitRow(line, `${hint}${elapsedMeta(elapsedMs, running)}`.trimEnd(), bodyWidth), width));
 		if (expanded) rows.push(...entryBodyRows(entry, width, rail, "  "));
 	} else {
-		const entries: TreeEntry[] = [];
-		for (const member of members) {
-			if (isToolComponent(member)) entries.push({ kind: "tool", tool: member });
-			else if (expanded && thoughtText(member)) entries.push({ kind: "thought", text: thoughtText(member) });
-		}
-		const column = nameColumn([...tools.map((tool) => tool.toolName), ...(entries.some((entry) => entry.kind === "thought") ? ["thinking"] : [])]);
-		rows.push(geekRow(rail, geekSplitRow(headLeft(tools, thoughts, failed, running), `${hint}${elapsedMeta(elapsedMs, false)}`.trimEnd(), bodyWidth), width));
+		const entries: TreeEntry[] = tools.map((tool) => ({ kind: "tool", tool }));
+		const column = nameColumn(tools.map((tool) => tool.toolName));
+		rows.push(geekRow(rail, geekSplitRow(headLeft(tools, failed, running), `${hint}${elapsedMeta(elapsedMs, false)}`.trimEnd(), bodyWidth), width));
 		rows.push(...renderToolTree(entries, width, rail, expanded, column));
 	}
 	rows.push(geekRow("line", "", width));
