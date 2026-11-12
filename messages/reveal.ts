@@ -8,7 +8,10 @@
  * half-typed markdown (`**bo`, `[a](ht`) from ever flashing as raw syntax.
  *
  * - The cursor advances on a ~30fps ticker that runs only while some message is behind its text.
- *   Rate = BASE chars/s, raised so a burst drains in MAX_LAG_S; held there until the backlog is gone.
+ *   Pacing is a playout buffer: each time new text arrives the rate is set so the backlog lasts until the
+ *   next text is expected (the measured gap between arrivals + 25%, within MIN/MAX_HORIZON_S). Text that
+ *   arrives in bursts then shows at a steady pace instead of a sprint followed by a stop.
+ * - The fade spans the chars revealed in the last FADE_S, so a fast stream fades in rather than pops.
  * - Only a component that is on the live stream when first rendered reveals, so history, resume and
  *   finished messages render instantly. When its stream ends the remainder finishes within END_BUDGET_MS.
  * - Rows that are not in the fade window are passed through untouched; the cost per frame is one
@@ -22,24 +25,39 @@ import { isComponentOnActiveStream } from "./assistant-streaming-state.js";
 
 /** Chars per second when caught up (~11ms per char). */
 const BASE_RATE = 90;
-/** A burst drains within this long. */
-const MAX_LAG_S = 0.35;
+/** Until the gap between arrivals is known, a burst drains within this long. */
+const FIRST_HORIZON_S = 0.35;
+/**
+ * The backlog is spread over the expected gap to the next arrival, clamped to this range: the floor keeps
+ * the pace from following every chunk-size wobble, the ceiling bounds the delay behind the stream.
+ */
+const MIN_HORIZON_S = 0.25;
+const MAX_HORIZON_S = 0.5;
+/** A long pause (a tool call) counts as this much, so one pause does not slow the pace for long. */
+const MAX_GAP_S = 1;
 /** After the stream ends, whatever is left is shown within this long (spec: <= 300ms incl. tick jitter). */
 const END_BUDGET_MS = 250;
-/** The newest FADE characters are partially faded. */
-const FADE = 6;
+/** The chars revealed in the last FADE_S are partially faded, at least MIN_FADE and at most MAX_FADE of them. */
+const FADE_S = 0.066;
+const MIN_FADE = 6;
+const MAX_FADE = 40;
 const FRAME_MS = 33;
 /** A stalled event loop must not turn into one big jump. */
 const MAX_DT_MS = 100;
 
 interface RevealState {
 	component: object;
-	/** Cursor in units (visible chars + 1 per row); may run FADE past `total` so the tail settles to full color. */
+	/** Cursor in units (visible chars + 1 per row); may run `fade` past `total` so the tail settles to full color. */
 	revealed: number;
 	total: number;
 	rate: number;
+	/** Width of the fade in units, from `rate`. */
+	fade: number;
 	lastAt: number;
 	endedAt: number;
+	/** When text last arrived, and the smoothed gap between arrivals in seconds (unset until two arrivals). */
+	arrivedAt: number;
+	gapS: number | undefined;
 	/** Length cache for the rows of the last render, keyed by row string. */
 	counts: Map<string, number>;
 }
@@ -70,7 +88,23 @@ function stopTicker(): void {
 	ticking.clear();
 }
 
-const isDone = (s: RevealState): boolean => s.revealed >= s.total + FADE;
+const isDone = (s: RevealState): boolean => s.revealed >= s.total + s.fade;
+
+function setRate(s: RevealState, rate: number): void {
+	s.rate = Math.max(BASE_RATE, rate);
+	s.fade = Math.min(MAX_FADE, Math.max(MIN_FADE, Math.round(s.rate * FADE_S)));
+}
+
+/** New text: spread the backlog over the time until the next text is expected. */
+function onArrival(s: RevealState, now: number): void {
+	if (s.arrivedAt !== 0) {
+		const gap = Math.min(now - s.arrivedAt, MAX_GAP_S * 1000) / 1000;
+		s.gapS = s.gapS === undefined ? gap : s.gapS + (gap - s.gapS) * 0.3;
+	}
+	s.arrivedAt = now;
+	const horizon = s.gapS === undefined ? FIRST_HORIZON_S : Math.min(MAX_HORIZON_S, Math.max(MIN_HORIZON_S, s.gapS * 1.25));
+	setRate(s, (s.total - s.revealed) / horizon);
+}
 
 function advance(s: RevealState, now: number): void {
 	if (s.endedAt === 0 && !isComponentOnActiveStream(s.component)) s.endedAt = now;
@@ -81,13 +115,8 @@ function advance(s: RevealState, now: number): void {
 		return;
 	}
 	const backlog = s.total - s.revealed;
-	if (backlog > 0) {
-		const budgetS = s.endedAt !== 0 ? Math.max(0.03, (END_BUDGET_MS - (now - s.endedAt)) / 1000) : MAX_LAG_S;
-		s.rate = Math.max(s.rate, BASE_RATE, backlog / budgetS);
-	} else {
-		s.rate = BASE_RATE;
-	}
-	s.revealed = Math.max(s.revealed, Math.min(s.revealed + s.rate * dt, s.total + FADE));
+	if (s.endedAt !== 0 && backlog > 0) setRate(s, Math.max(s.rate, backlog / Math.max(0.03, (END_BUDGET_MS - (now - s.endedAt)) / 1000)));
+	s.revealed = Math.max(s.revealed, Math.min(s.revealed + s.rate * dt, s.total + s.fade));
 }
 
 function tick(): void {
@@ -167,7 +196,7 @@ function fadeColor(alpha: number, target: Rgb): string {
  * and (truecolor) color the ones within FADE of it between faint and their own color.
  * Escape sequences are copied whole and graphemes are never split.
  */
-function cutRow(row: string, start: number, n: number, revealed: number, fade: boolean): string {
+function cutRow(row: string, start: number, n: number, revealed: number, fade: number): string {
 	const limit = Math.min(n, Math.ceil(revealed - start));
 	const partial = limit < n;
 	let out = "";
@@ -184,7 +213,7 @@ function cutRow(row: string, start: number, n: number, revealed: number, fade: b
 			}
 			if (j >= limit) return out + RESET + (row.includes("\x1b]8;") ? HYPERLINK_CLOSE : "");
 			const age = revealed - (start + j);
-			out += fade && age < FADE && ch.trim() !== "" ? fadeColor(age / FADE, fg ?? INK) + ch : ch;
+			out += fade > 0 && age < fade && ch.trim() !== "" ? fadeColor(age / fade, fg ?? INK) + ch : ch;
 			j++;
 		}
 		if (esc < 0) break;
@@ -210,7 +239,7 @@ export function revealBody(component: object, rows: string[]): string[] {
 	}
 	if (!s) {
 		if (!isComponentOnActiveStream(component)) return rows;
-		s = { component, revealed: 0, total: 0, rate: BASE_RATE, lastAt: Date.now(), endedAt: 0, counts: new Map() };
+		s = { component, revealed: 0, total: 0, rate: BASE_RATE, fade: MIN_FADE, lastAt: Date.now(), endedAt: 0, arrivedAt: 0, gapS: undefined, counts: new Map() };
 		states.set(component, s);
 	}
 
@@ -225,7 +254,9 @@ export function revealBody(component: object, rows: string[]): string[] {
 		total += n + 1;
 	}
 	s.counts = cache;
+	const grew = total > s.total;
 	s.total = total;
+	if (grew && s.endedAt === 0) onArrival(s, Date.now());
 
 	if (isDone(s)) {
 		if (!isComponentOnActiveStream(component)) states.delete(component);
@@ -233,12 +264,12 @@ export function revealBody(component: object, rows: string[]): string[] {
 	}
 	startTicking(s);
 
-	const fade = detectColorMode() === "truecolor";
+	const fade = detectColorMode() === "truecolor" ? s.fade : 0;
 	const shown: string[] = [];
 	let start = 0;
 	for (let i = 0; i < rows.length && start < s.revealed; i++) {
 		const n = counts[i]!;
-		shown.push(start + n - 1 + FADE <= s.revealed ? rows[i]! : cutRow(rows[i]!, start, n, s.revealed, fade));
+		shown.push(start + n - 1 + s.fade <= s.revealed ? rows[i]! : cutRow(rows[i]!, start, n, s.revealed, fade));
 		start += n + 1;
 	}
 	return shown;
