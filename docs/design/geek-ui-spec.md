@@ -56,14 +56,16 @@ cell short of the edge; the rail prefix, head row and the blank row after the me
 
 ### 4. Tool group (one row per call)
 ```
- ┃ Done(3 tool calls · 1 thought)                          ^o  // 0.6s
+ ┃ Done(3 tool calls)                                      ^o  // 0.6s
  ┃ ├─ R tool-tags/tool-groups.ts
  ┃ ├─ $ git log --oneline -5 && …
  ┃ ├─ G "REFRESH_TTL" in src
  ┃ └─ · piggery_send  to tools · kind relay · body QUEUED after P0 #1358 — …
 ```
-A run of consecutive non-edit calls (and the tool-only assistant turns that issued them) is one block; edit/write
-break the run. Head: `Done(` / `Running(` bold (Running in accent), dim counts `N tool call(s) · N thought(s)`,
+A run of consecutive non-edit calls (and the assistant turns that issued them with nothing to show) is one block;
+edit/write break the run. An assistant turn with answer text or a visible thinking row (`thinking · tail`)
+renders as itself above the calls it issued. Head: `Done(` / `Running(` bold (Running in
+accent), dim count `N tool call(s)`,
 `N failed` in del, while running ` · <name of the live tool>`, dim `)`. Right: faint `^o  ` (hidden once expanded)
 + dim `// ` + num seconds + dim `s` (summed). A lone call is just its row (no head, no guide) with the same
 right meta (`running` accent while it runs). Rows are clipped with `…`, never wrapped.
@@ -77,15 +79,17 @@ offset/limit), `$` bash/powershell command (leading `cd <dir> &&` dropped; num b
 No suffix heuristics: `memory_read` is generic. Values are single-line, cut at ~120, arrays `N items` /
 `N operations (type)`, objects `{N keys}`. A missing primary arg (still streaming) shows dim `…`.
 A failed call's badge turns del-marker bg (generic names too). Ctrl+O adds each call's output (dim, capped by
-`maxExpandedLines`) under its guide, plus thought rows (`T`). `┃` per the rail rules above.
+`maxExpandedLines`) under its guide. `┃` per the rail rules above.
 
 ### 5. Assistant markdown
 `## cause` accent; inline code = faint backtick + mono text + faint backtick; numbers num;
 list bullet `- ` accent. Code blocks: 2-col indent, faint `// lang` label row, code one step below prose (`dim`
 base, syntax tokens keep their palette colors).
 Streamed answers reveal progressively (`revealAnimation`, default on): the rendered rows are cut at a cursor that
-advances ~90 chars/s (faster to drain a burst within ~0.35s), the newest 6 characters fade in from `faint`; once
-the stream ends the rest shows within ~250ms. History, resumed and finished messages render at once;
+advances ~90 chars/s when caught up. Each time text arrives, the backlog is spread over the expected wait for the
+next text (the measured gap between arrivals + 25%, kept within 0.25–0.5s; 0.35s before a gap is known), so text a
+server sends in bursts shows at a steady pace instead of stopping between bursts. The characters revealed in the
+last ~66ms (6–40) fade in from `faint`; once the stream ends the rest shows within ~250ms. History, resumed and finished messages render at once;
 `revealAnimation: false` or `PI_REDUCED_MOTION=1` turns it off.
 
 ### 6. Edit call
