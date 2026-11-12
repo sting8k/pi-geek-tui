@@ -17,7 +17,8 @@ core.initTheme("dark");
 const corePiTui = new URL("../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-tui/dist/index.js", import.meta.url).href;
 const { Container, Text } = await import(corePiTui).catch(() => import("@earendil-works/pi-tui"));
 
-const strip = (text) => String(text).replace(/\x1b\][^\x07]*\x07/g, "").replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
+// APC too: Pi 1.5 wraps the fake cursor in `\x1b_pi:fc\x07`…`\x1b_pi:/fc\x07`, invisible on screen.
+const strip = (text) => String(text).replace(/\x1b\][^\x07]*\x07|\x1b_[^\x07]*\x07/g, "").replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
 const failures = [];
 const expect = (name, condition, detail = "") => { if (!condition) failures.push(`${name}${detail ? `: ${detail}` : ""}`); };
 
@@ -33,6 +34,7 @@ const mode = {
 	ui: { setFocus() {}, requestRender() {}, terminal: { rows: 24 } },
 	keybindings: {},
 	disposeActiveSelector() {}, // Pi 1.x setCustomEditorComponent closes an open selector first
+	extensionDialogs: [], // Pi 1.5 setCustomEditorComponent keeps the slot while an extension dialog is open
 };
 core.InteractiveMode.prototype.setCustomEditorComponent.call(mode, () => mode.editor);
 const container = mode.editorContainer;
