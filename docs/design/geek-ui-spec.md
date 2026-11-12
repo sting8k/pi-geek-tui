@@ -20,10 +20,10 @@ is forked from pi-droid-styling and must keep working — change visuals, not th
 | rail | `#3a3a34` | idle rail `┊` |
 | rule | `#2a2a26` | footer horizontal rule `─` |
 | panel | `#141414` (selected row `#201f1b`) | slash menu / editor-slot panel surface, user prompt body |
-| accent | `#dd5670` default; config options `#dd5670` `#d8785b` `#88c6a3` `#d8d4b4` (or any hex) | `π`, `## heading`, list `-`, active rail `┃`, running state, statusline thinking badge, `T` badge |
+| accent | `#dd5670` default; config options `#dd5670` `#d8785b` `#88c6a3` `#d8d4b4` (or any hex) | `π`, `## heading`, list `-`, active rail `┃`, running state, statusline thinking badge |
 | del | marker `#dd5670`, row bg `#251518` | diff removed |
 | add | marker `#88c6a3`, row bg `#1b221e` | diff added |
-| badge default | bg `#a8a385`, fg `#0c0c0c` | 1-cell tool badge (`R`, `T`…) |
+| badge default | bg `#a8a385`, fg `#0c0c0c` | 1-cell tool badge (`R`, `$`…) |
 
 ## Layout grammar (columns, monospace cells)
 
@@ -74,7 +74,7 @@ Call row = 1-cell badge + space + params. Built-ins (Pi 1.1.0 `allToolNames`, ex
 that stands for the name and show only their primary arg in ink: `R` read path (`:10-14` / `:10+` with
 offset/limit), `$` bash/powershell command (leading `cd <dir> &&` dropped; num bg), `E` edit path (kw bg),
 `W` write path (kw bg), `G` grep `"pattern"` + dim ` in path` / ` glob g`, `F` find pattern + path, `L` ls path
-(default `.`); `T` thinking is accent bg. Every other tool: `·` badge, raw name in `punct` padded to a shared column
+(default `.`). Every other tool: `·` badge, raw name in `punct` padded to a shared column
 (longest generic name + 2, clamped 4..16), then `key value` pairs (faint key, ink value) joined by dim ` · `.
 No suffix heuristics: `memory_read` is generic. Values are single-line, cut at ~120, arrays `N items` /
 `N operations (type)`, objects `{N keys}`. A missing primary arg (still streaming) shows dim `…`.

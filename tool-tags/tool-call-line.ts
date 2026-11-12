@@ -21,7 +21,6 @@ const BADGES: Record<string, { letter: string; bg: GeekColorRole }> = {
 	grep: { letter: "G", bg: "badgeBg" },
 	find: { letter: "F", bg: "badgeBg" },
 	ls: { letter: "L", bg: "badgeBg" },
-	thinking: { letter: "T", bg: "accent" },
 };
 
 function isCommonTool(toolName: string): boolean {

@@ -6,7 +6,7 @@ Forked from pi-droid-styling 2.18.0; earlier history: https://github.com/sting8k
 
 ### Changed
 - Streamed answers keep a steady pace when the server sends text in large bursts. The reveal used to rush through each burst within 0.35 s and then stop until the next one; it now spreads each burst over the measured wait for the next one (0.25–0.5 s), and the fade widens with the speed (6–40 characters) so fast text fades in instead of popping in.
-- Thinking that ends in a tool call stays visible. It was folded into the tool group and only shown with `Ctrl+O` (not at all for a lone call); the `thinking · …` row now stays above the calls, as it does before an answer. Group heads no longer count thoughts.
+- Thinking that ends in a tool call stays visible. It was folded into the tool group and only shown with `Ctrl+O` (not at all for a lone call); the `thinking · …` row now stays above the calls, as it does before an answer. Group heads no longer count thoughts, and the `T` thought badge is gone.
 
 ### Fixed
 - Tests pass against Pi 1.5 (test stubs only: the mocked interactive mode lacked `extensionDialogs`, and the test's ANSI stripper did not drop Pi 1.5's fake-cursor markers).
